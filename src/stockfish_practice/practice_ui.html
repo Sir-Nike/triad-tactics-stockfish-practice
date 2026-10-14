@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Triad Tactics · Stockfish practice</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111823;color:#e8edf5;font:16px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:32px 24px}h1{font-size:32px;margin:8px 0}h2{font-size:20px}p{color:#b2bfd2;line-height:1.6}.tag{color:#84d4ba;font-size:13px;letter-spacing:2px}section{background:#1a2433;border:1px solid #334155;border-radius:14px;padding:24px;margin-top:24px}.layout{display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:28px}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}label{display:block;font-size:14px;color:#b2bfd2}input,select,button{font:inherit;color:inherit;background:#111823;border:1px solid #46566e;border-radius:8px;padding:10px;width:100%;margin-top:7px}button{cursor:pointer;background:#296957;border-color:#438c76;font-weight:600}button.secondary{background:#243347}button:disabled{opacity:.45;cursor:default}.row{display:flex;gap:12px;margin-top:14px}.board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:8px;overflow:hidden}.square{position:relative;display:flex;align-items:center;justify-content:center;font-family:"Arial Unicode MS",sans-serif;font-size:clamp(24px,5vw,47px);border:0;border-radius:0;margin:0;padding:0;cursor:pointer}.light{background:#d8dfd7}.dark{background:#7b9a86}.piece-white{color:#fff;text-shadow:0 1px 2px #000,1px 0 #000,-1px 0 #000}.piece-black{color:#17221c}.selected{box-shadow:inset 0 0 0 4px #ffd166}.coord{position:absolute;bottom:2px;left:4px;font:10px system-ui;color:#233a2d}.clocks{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px}.clock{background:#111823;border-radius:8px;padding:12px 16px;flex:1}.clock strong{display:block;font:26px ui-monospace,monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111823;padding:16px;border-radius:8px;font-size:13px}#message{color:#ffd166;min-height:24px;overflow-wrap:anywhere}#state{color:#84d4ba}.note{font-size:13px}a{color:#84d4ba}#moves{max-height:150px;overflow:auto}@media(max-width:760px){.layout{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr}main{padding:20px 14px}.square{font-size:40px}}
+.coord{text-shadow:none}
+</style>
+<main>
+<div class="tag">CHROMA / TECHTATVA 2026</div>
+<h1>Stockfish practice arena</h1>
+<p>Test your local fine-tuned LLM against Stockfish. Choose a search level, your side, and clocks. Personal practice results are separate from the event tournament.</p>
+<section>
+<label>Practice team token<input id="token" type="password" autocomplete="off" placeholder="Paste the token issued by the organizer"></label>
+<div class="controls">
+<label>Your side<select id="colour"><option>white</option><option>black</option><option>random</option></select></label>
+<label>Engine level<select id="level"></select></label>
+<label>Time preset<select id="preset"><option value="main">Main game · 10 + 0</option><option value="armageddon">Armageddon · White 5 / Black 3</option><option value="custom">Custom clocks</option></select></label>
+<label>White minutes<input id="white" type="number" min="0.0167" max="60" step="any" value="10"></label>
+<label>Black minutes<input id="black" type="number" min="0.0167" max="60" step="any" value="10"></label>
+<label>Increment seconds<input id="increment" type="number" min="0" max="60" step="any" value="0"></label>
+</div>
+<div class="row"><button id="start">Start practice</button><button id="reconnect" class="secondary">Reconnect session</button></div>
+<label>Session ID<input id="sessionId" placeholder="Save this ID to resume after disconnecting"></label>
+<p class="note">Levels 1–10 change depth and thinking budgets; they are not native Stockfish skill settings or Elo ratings. This board supports manual review; your LLM connects through the HTTP API below.</p>
+</section>
+<section class="layout">
+<div><div class="clocks"><div class="clock">White<strong id="wc">10:00</strong></div><div class="clock">Black<strong id="bc">10:00</strong></div></div><div id="board" class="board" aria-label="Chessboard"></div></div>
+<div><h2>Session</h2><p id="state">Ready to start</p><p id="message" role="status"></p>
+<label>UCI move<input id="uci" placeholder="e2e4 · e7e8q"></label>
+<label>Promotion<select id="promotion"><option value="q">Queen</option><option value="r">Rook</option><option value="b">Bishop</option><option value="n">Knight</option></select></label>
+<button id="move" disabled>Submit move</button><div class="row"><button id="resign" class="secondary" disabled>Resign</button><button id="pgn" class="secondary" disabled>Download PGN</button></div>
+<p class="note">Click a piece and destination or enter a UCI move. Your clock includes model inference and submission time. Disconnecting does not pause it.</p><pre id="moves">No moves yet</pre></div>
+</section>
+<section><h2>Connect your LLM</h2><p>Run your model locally and return a legal UCI move from <code>choose(session)</code>. The session includes FEN, accepted move history, legal moves, side and clocks. The hosted tournament callback has a different contract.</p>
+<pre>export STOCKFISH_API_URL=http://127.0.0.1:8003
+export STOCKFISH_TEAM_TOKEN='your-practice-token'
+chess-sdk practice --agent local_agent:choose --colour black --level 5 \
+  --white-minutes 10 --black-minutes 10</pre>
+<h2>HTTP API</h2><p>Use <code>Authorization: Bearer TOKEN</code> and JSON bodies. Create and action IDs must stay unchanged when retrying a lost response.</p>
+<pre>GET  /v1/profiles
+POST /v1/sessions
+  {"request_id":"unique-id","colour":"black","level":5,
+   "time_control":{"white":600,"black":600,"increment":0},
+   "agent":{"model":"my-local-llm","harness":"v1"}}
+GET  /v1/sessions/SESSION_ID
+POST /v1/sessions/SESSION_ID/actions
+  {"action_id":"unique-id","position_version":1,"action":"move","uci":"e7e5"}
+  action can also be "resign" or "cancel" (cancel before the first move only).
+GET  /v1/sessions/SESSION_ID/pgn
+GET  /v1/teams/me/history?limit=50&amp;offset=0</pre>
+<p class="note">Poll until <code>engine_pending</code> is false, then ask your LLM for the move. Inspect <code>accepted</code> and <code>reason</code> on each reply. A rejected move keeps your clock running. Engine failures mark the attempt invalid. Sessions and history are kept in memory and are lost on server restart; ratings are not implemented. Draw claims are automatic; Armageddon draw odds are tournament advancement rules, while this API records the chess result.</p>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const depths=[1,2,3,4,6,8,10,12,15,18];
+depths.forEach((d,i)=>$('level').add(new Option(`${i+1} · depth ${d}`,i+1)));$('level').value=5;
+let game=null,selected=null,receivedAt=0,busy=false;
+const pieces={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+function message(s){$('message').textContent=s}
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${$('token').value}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok){const e=await r.json();throw Error(e.detail||`HTTP ${r.status}`)}return r.json()}
+function render(){const fen=(game?.fen||'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1').split(' ')[0];const cells=[];fen.split('/').forEach((rank,r)=>{let f=0;for(const p of rank){if(/\d/.test(p)){for(let i=0;i<Number(p);i++)cells.push({sq:String.fromCharCode(97+f++)+(8-r),p:'',r,f:f-1});}else{cells.push({sq:String.fromCharCode(97+f)+(8-r),p,r,f});f++}}});if(game?.colour==='black')cells.reverse();$('board').replaceChildren();for(const c of cells){const b=document.createElement('button');b.className=`square ${(c.r+c.f)%2?'dark':'light'} ${c.p===c.p.toUpperCase()?'piece-white':'piece-black'} ${selected===c.sq?'selected':''}`;b.setAttribute('aria-label',`${c.sq} ${c.p||'empty'}`);b.textContent=pieces[c.p]||'';const n=document.createElement('span');n.className='coord';n.textContent=c.sq;b.append(n);b.onclick=()=>{if(!game||game.engine_pending||game.status!=='running'||busy)return;if(!selected){selected=c.sq;render();return}let uci=selected+c.sq;if(game.legal_moves.some(m=>m.startsWith(uci)&&m.length===5))uci+=$('promotion').value;$('uci').value=uci;selected=null;render()};$('board').append(b)}if(game){$('state').textContent=game.status==='running'?`Playing ${game.colour} · level ${game.opponent.level} · ${game.engine_pending?'Stockfish thinking':game.turn+' to move'}`:`${game.status} · ${game.result||'no result'} · ${game.reason}`;$('moves').textContent=game.history.join(' ')||'No moves yet';$('sessionId').value=game.id}const active=game?.status==='running';$('start').disabled=busy||active;$('move').disabled=busy||!active||game.engine_pending;$('resign').disabled=busy||!active;$('pgn').disabled=!game;clocks()}
+function clocks(){for(const side of ['white','black']){let seconds=game?game.clocks[side]:Number($(side).value)*60;if(game?.status==='running'&&game.turn===side)seconds=Math.max(0,seconds-(performance.now()-receivedAt)/1000);const whole=Math.ceil(seconds);$(side==='white'?'wc':'bc').textContent=`${Math.floor(whole/60)}:${String(whole%60).padStart(2,'0')}`}}
+function setGame(g){game=g;receivedAt=performance.now();render()}
+async function task(fn){if(busy)return;busy=true;render();try{await fn();message('')}catch(e){message(e.message)}finally{busy=false;render()}}
+$('preset').onchange=()=>{const a=$('preset').value==='armageddon';if($('preset').value!=='custom'){$('white').value=a?5:10;$('black').value=a?3:10;$('increment').value=0}clocks()};
+for(const id of ['white','black','increment'])$(id).oninput=()=>{$('preset').value='custom';clocks()};
+let pendingCreate=null,pendingAction=null;
+$('start').onclick=()=>task(async()=>{const settings={colour:$('colour').value,level:Number($('level').value),time_control:{white:Number($('white').value)*60,black:Number($('black').value)*60,increment:Number($('increment').value)},agent:{harness:'browser-review'}};const signature=JSON.stringify(settings);if(!pendingCreate||pendingCreate.signature!==signature)pendingCreate={signature,body:{request_id:crypto.randomUUID(),...settings}};setGame(await api('/v1/sessions',pendingCreate.body));pendingCreate=null});
+$('reconnect').onclick=()=>task(async()=>{setGame(await api('/v1/sessions/'+encodeURIComponent($('sessionId').value.trim())))});
+async function action(type){let data={position_version:game.position_version,action:type};if(type==='move')data.uci=$('uci').value.trim();const signature=JSON.stringify(data);if(!pendingAction||pendingAction.signature!==signature)pendingAction={signature,body:{action_id:crypto.randomUUID(),...data}};const reply=await api(`/v1/sessions/${game.id}/actions`,pendingAction.body);pendingAction=null;setGame(reply.session);if(!reply.accepted)throw Error(reply.reason);$('uci').value=''}
+$('move').onclick=()=>task(()=>action('move'));$('resign').onclick=()=>task(()=>action('resign'));
+$('pgn').onclick=()=>task(async()=>{const r=await fetch(`/v1/sessions/${game.id}/pgn`,{headers:{Authorization:`Bearer ${$('token').value}`}});if(!r.ok)throw Error('PGN download failed');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=`practice-${game.id}.pgn`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+setInterval(async()=>{clocks();if(!game||game.status!=='running'||busy)return;busy=true;try{setGame(await api('/v1/sessions/'+game.id));message('')}catch(e){message(`Connection issue: ${e.message}. Clock continues; reconnect with the session ID.`)}finally{busy=false;render()}},1000);setInterval(clocks,100);render();
+</script>
+</html>

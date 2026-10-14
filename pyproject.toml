@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "triad-tactics-stockfish-practice"
+version = "0.1.0"
+description = "Practice API and browser board for local chess LLMs against Stockfish"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["chess==1.11.2", "httpx==0.28.1"]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.5", "ruff==0.11.11"]
+
+[project.scripts]
+stockfish-practice = "stockfish_practice.server:main"
+stockfish-practice-cli = "stockfish_practice.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stockfish_practice = ["practice_ui.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
